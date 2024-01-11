@@ -6,7 +6,7 @@ from tqdm import trange
 import time
 
 from src.utils_log import Summary, AverageMeter, ProgressMeter
-from src.evaluation import accuracy
+from src.evaluation import accuracy, accuracy_gate
 import ipdb
 
 AVOID_ZERO_DIV = 1e-6
@@ -137,19 +137,28 @@ def train_gate(train_loader, model, criterion, optimizer, epoch, device, args, i
 
             # llabels = torch.argmin(concatloss, dim=1)
 
-            loss = criterion(gates, decision_from_gate)
-            for idx in range(logits.shape[2]):
-                loss += criterion(logits[:, :, idx], target)
-            loss = loss.mean()
+            # loss = criterion(gates, decision_from_gate)
+            # for idx in range(logits.shape[2]):
+                # loss += criterion(logits[:, :, idx], target)/5
+            # loss = loss.mean()
+            # print(loss.item())
 
-        maxidx = torch.max(gates, dim=1)[1]
-        acc1 = (pred[range(len(maxidx)), :, maxidx].argmax(dim=1) == target).sum()/images.size(0)
+            # loss = criterion(gates, decision_from_gate).mean()
+            # for idx in range(logits.shape[2]):
+                # loss += criterion(logits[:, :, idx], target).mean()/5
+            # print(loss.item())
+
+            logits_reshape = logits.permute(2, 0, 1).reshape(-1, logits.size(1))
+            target_repeat = target.unsqueeze(0).expand(logits.size(2), logits.size(0)).flatten()
+            loss = (criterion(gates, decision_from_gate).mean() +
+                    criterion(logits_reshape, target_repeat).mean())
+            # print(loss.item())
 
         # measure accuracy and record loss
-        # acc1, acc5 = accuracy(output, orig_target, topk=(1, 5))
+        acc1, acc5 = accuracy_gate(gates, pred, target)
         losses.update(loss.item(), images.size(0))
         top1.update(acc1, images.size(0))
-        # top5.update(acc5[0], images.size(0))
+        top5.update(acc5, images.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
