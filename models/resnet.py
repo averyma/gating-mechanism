@@ -394,25 +394,25 @@ class ResNet_gate(nn.Module):
         x = self.layer1(x * gate)
         x_flatten = torch.flatten(x, 1)
         gate1 = self.Gate1(x_flatten)
-        gate.mul_(1 - gate1)
+        gate = gate*(1 - gate1)
         logit1 = self.fc1(x_flatten * (1-gate).flatten(1))
 
         x = self.layer2(x * gate)
         x_flatten = torch.flatten(x, 1)
         gate2 = self.Gate2(x_flatten)
-        gate.mul_(1 - gate2)
+        gate = gate*(1 - gate2)
         logit2 = self.fc2(x_flatten * (1-gate).flatten(1))
 
         x = self.layer3(x * gate)
         x_flatten = torch.flatten(x, 1)
         gate3 = self.Gate3(x_flatten)
-        gate.mul_(1 - gate3)
+        gate = gate*(1 - gate3)
         logit3 = self.fc3(x_flatten * (1-gate).flatten(1))
 
         x = self.layer4(x * gate)
         x_flatten = torch.flatten(x, 1)
         gate4 = self.Gate4(x_flatten)
-        gate.mul_(1 - gate4)
+        gate = gate*(1 - gate4)
         logit4 = self.fc4(x_flatten * (1-gate).flatten(1))
 
         x = self.avgpool(x * gate)
@@ -420,31 +420,44 @@ class ResNet_gate(nn.Module):
         gate5 = self.Gate5(x_flatten)
         logit5 = self.fc5(x_flatten)
 
-        gates = (gate1, gate2, gate3, gate4, gate5)
-        logits = (logit1, logit2, logit3, logit4, logit5)
-        return gates, logits
+        concatgate = torch.cat([gate1, gate2, gate3, gate4, gate5], dim=1).squeeze()
+        concatlogit = torch.cat([logit1.unsqueeze(2),
+                                 logit2.unsqueeze(2),
+                                 logit3.unsqueeze(2),
+                                 logit4.unsqueeze(2),
+                                 logit5.unsqueeze(2)], dim=2)
+        return concatgate, concatlogit
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
 
-def resnet18():
-    return ResNet_gate(BasicBlock, [2, 2, 2, 2])
+def resnet18(gate):
+    if not gate:
+        return ResNet(BasicBlock, [2, 2, 2, 2])
+    else:
+        return ResNet_gate(BasicBlock, [2, 2, 2, 2])
 
-def resnet34():
-    return ResNet_gate(BasicBlock, [3, 4, 6, 3])
+def resnet34(gate):
+    if not gate:
+        return ResNet(BasicBlock, [3, 4, 6, 3])
+    else:
+        return ResNet_gate(BasicBlock, [3, 4, 6, 3])
 
-def resnet50():
-    return ResNet_gate(Bottleneck, [3, 4, 6, 3])
+def resnet50(gate):
+    if not gate:
+        return ResNet(Bottleneck, [3, 4, 6, 3])
+    else:
+        return ResNet_gate(Bottleneck, [3, 4, 6, 3])
 
-# def resnet50(gate):
-    # if not gate:
-        # return ResNet(Bottleneck, [3, 4, 6, 3])
-    # else:
-        # return ResNet_gate(Bottleneck, [3, 4, 6, 3])
+def resnet101(gate):
+    if not gate:
+        return ResNet(Bottleneck, [3, 4, 23, 3])
+    else:
+        return ResNet_gate(Bottleneck, [3, 4, 23, 3])
 
-def resnet101():
-    return ResNet(Bottleneck, [3, 4, 23, 3])
-
-def resnet152():
-    return ResNet(Bottleneck, [3, 8, 36, 3])
+def resnet152(gate):
+    if not gate:
+        return ResNet(Bottleneck, [3, 8, 36, 3])
+    else:
+        return ResNet_gate(Bottleneck, [3, 8, 36, 3])
 

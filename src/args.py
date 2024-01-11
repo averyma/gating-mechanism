@@ -187,6 +187,8 @@ def parse_args():
     parser.add_argument('--source_idx', default=0, type=int)
     parser.add_argument('--target_idx', default=1, type=int)
 
+    parser.add_argument("--gate",
+                        default=False, type=distutils.util.strtobool)
 
     args = parser.parse_args()
 

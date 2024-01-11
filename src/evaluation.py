@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from src.attacks import pgd, pgd_linbp
 from src.context import ctx_noparamgrad_and_eval
 import ipdb
@@ -107,6 +108,83 @@ def validate(val_loader, model, criterion, args, is_main_task, whitebox=False):
             losses.update(loss.item(), images.size(0))
             top1.update(acc1[0], images.size(0))
             top5.update(acc5[0], images.size(0))
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0 and is_main_task:
+                progress.display(i + 1)
+            if args.debug:
+                break
+
+    batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
+    losses = AverageMeter('Loss', ':.4e', Summary.NONE)
+    top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
+    top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
+    progress = ProgressMeter(
+        len(val_loader) + (args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset))),
+        [batch_time, losses, top1, top5],
+        prefix='Test: ')
+
+    # switch to evaluate mode
+    model.eval()
+
+    run_validate(val_loader)
+    if args.distributed:
+        top1.all_reduce()
+        top5.all_reduce()
+
+    if args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset)):
+        aux_val_dataset = Subset(val_loader.dataset,
+                                 range(len(val_loader.sampler) * args.world_size, len(val_loader.dataset)))
+        aux_val_loader = torch.utils.data.DataLoader(
+            aux_val_dataset, batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True)
+        run_validate(aux_val_loader, len(val_loader))
+
+    if is_main_task:
+        progress.display_summary()
+
+    return top1.avg, top5.avg
+
+def validate_gate(val_loader, model, criterion, args, is_main_task):
+
+    def run_validate(loader, base_progress=0):
+        end = time.time()
+        for i, (images, target) in enumerate(loader):
+            i = base_progress + i
+            if args.gpu is not None and torch.cuda.is_available():
+                images = images.cuda(args.gpu, non_blocking=True)
+            if torch.backends.mps.is_available():
+                images = images.to('mps')
+                target = target.to('mps')
+            if torch.cuda.is_available():
+                target = target.cuda(args.gpu, non_blocking=True)
+
+            # compute output
+            with torch.no_grad():
+                gates, logits = model(images)
+
+                pred = F.softmax(logits, dim=1)
+                onehotlabels_new = torch.zeros_like(pred)
+                onehotlabels_new[range(len(target)), target, :] = 1
+                decision_from_gate = (-onehotlabels_new*pred).sum(dim=1).argmin(dim=1)
+
+                loss = criterion(gates, decision_from_gate)
+                for idx in range(logits.shape[2]):
+                    loss += criterion(logits[:, :, idx], target)
+                loss = loss.mean()
+
+
+
+            # measure accuracy and record loss
+            maxidx = torch.max(gates, dim=1)[1]
+            acc1 = (pred[range(len(maxidx)), :, maxidx].argmax(dim=1) == target).sum()/images.size(0)
+            # acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            losses.update(loss.item(), images.size(0))
+            top1.update(acc1, images.size(0))
+            # top5.update(acc5[0], images.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)

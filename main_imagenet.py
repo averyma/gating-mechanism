@@ -27,7 +27,7 @@ from src.utils_general import seed_everything, get_model, get_optim, remove_modu
 from src.transforms import get_mixup_cutmix
 # import dill as pickle
 from src.train import train, train_gate
-from src.evaluation import validate
+from src.evaluation import validate, validate_gate
 
 best_acc1 = 0
 
@@ -127,7 +127,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     print('{}: is_main_task: {}'.format(device, is_main_task))
 
-    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
+    if args.gate:
+        criterion = nn.CrossEntropyLoss(reduction='none')
+    else:
+        criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
 
     opt, lr_scheduler = get_optim(parameters, args)
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
@@ -284,10 +287,16 @@ def main_worker(gpu, ngpus_per_node, args):
         # train for one epoch
         if args.distributed:
             dist.barrier()
-        train_acc1, train_acc5, loss = train_gate(train_loader, model, criterion, opt, _epoch, device, args, is_main_task, scaler, mixup_cutmix)
+        if args.gate:
+            train_acc1, train_acc5, loss = train_gate(train_loader, model, criterion, opt, _epoch, device, args, is_main_task, scaler, mixup_cutmix)
+        else:
+            train_acc1, train_acc5, loss = train(train_loader, model, criterion, opt, _epoch, device, args, is_main_task, scaler, mixup_cutmix)
         if args.distributed:
             dist.barrier()
-        test_acc1, test_acc5 = validate(test_loader, model, criterion, args, is_main_task, False)
+        if args.gate:
+            test_acc1, test_acc5 = validate_gate(test_loader, model, criterion, args, is_main_task)
+        else:
+            test_acc1, test_acc5 = validate(test_loader, model, criterion, args, is_main_task)
         if args.distributed:
             dist.barrier()
         lr_scheduler.step()

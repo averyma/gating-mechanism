@@ -106,36 +106,50 @@ def train_gate(train_loader, model, criterion, optimizer, epoch, device, args, i
 
         # compute output
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            ipdb.set_trace()
             gates, logits = model(images)
+            # concatgate = torch.cat([gates[0], gates[1], gates[2], gates[3], gates[4]], dim=1).squeeze()
             # loss = criterion(output, target)
-            pred1 = F.softmax(logits[0], dim=1)
-            pred2 = F.softmax(logits[1], dim=1)
-            pred3 = F.softmax(logits[2], dim=1)
-            pred4 = F.softmax(logits[3], dim=1)
-            pred5 = F.softmax(logits[4], dim=1)
+            # pred1 = F.softmax(logits[:,:,0], dim=1)
+            # pred2 = F.softmax(logits[:,:,1], dim=1)
+            # pred3 = F.softmax(logits[:,:,2], dim=1)
+            # pred4 = F.softmax(logits[:,:,3], dim=1)
+            # pred5 = F.softmax(logits[:,:,4], dim=1)
 
-            onehotlabels = torch.zeros_like(pred1)
-            onehotlabels[range(len(target)), target] = 1
-            loss1 = torch.sum(-onehotlabels*pred1, dim=1)
-            loss2 = torch.sum(-onehotlabels*pred2, dim=1)
-            loss3 = torch.sum(-onehotlabels*pred3, dim=1)
-            loss4 = torch.sum(-onehotlabels*pred4, dim=1)
-            loss5 = torch.sum(-onehotlabels*pred5, dim=1)
+            # onehotlabels = torch.zeros_like(pred1)
+            # onehotlabels[range(len(target)), target] = 1
 
-            concatloss = torch.cat((loss1.unsqueeze(1),
-                                    loss2.unsqueeze(1),
-                                    loss3.unsqueeze(1),
-                                    loss4.unsqueeze(1),
-                                    loss5.unsqueeze(1)), dim=1)
+            pred = F.softmax(logits, dim=1)
+            onehotlabels_new = torch.zeros_like(pred)
+            onehotlabels_new[range(len(target)), target, :] = 1
+            decision_from_gate = (-onehotlabels_new*pred).sum(dim=1).argmin(dim=1)
 
+            # loss1 = torch.sum(-onehotlabels*pred1, dim=1)
+            # loss2 = torch.sum(-onehotlabels*pred2, dim=1)
+            # loss3 = torch.sum(-onehotlabels*pred3, dim=1)
+            # loss4 = torch.sum(-onehotlabels*pred4, dim=1)
+            # loss5 = torch.sum(-onehotlabels*pred5, dim=1)
 
+            # concatloss = torch.cat((loss1.unsqueeze(1),
+                                    # loss2.unsqueeze(1),
+                                    # loss3.unsqueeze(1),
+                                    # loss4.unsqueeze(1),
+                                    # loss5.unsqueeze(1)), dim=1)
+
+            # llabels = torch.argmin(concatloss, dim=1)
+
+            loss = criterion(gates, decision_from_gate)
+            for idx in range(logits.shape[2]):
+                loss += criterion(logits[:, :, idx], target)
+            loss = loss.mean()
+
+        maxidx = torch.max(gates, dim=1)[1]
+        acc1 = (pred[range(len(maxidx)), :, maxidx].argmax(dim=1) == target).sum()/images.size(0)
 
         # measure accuracy and record loss
-        acc1, acc5 = accuracy(output, orig_target, topk=(1, 5))
+        # acc1, acc5 = accuracy(output, orig_target, topk=(1, 5))
         losses.update(loss.item(), images.size(0))
-        top1.update(acc1[0], images.size(0))
-        top5.update(acc5[0], images.size(0))
+        top1.update(acc1, images.size(0))
+        # top5.update(acc5[0], images.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()

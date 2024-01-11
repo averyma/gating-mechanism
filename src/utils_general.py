@@ -16,6 +16,7 @@ import torch.nn as nn
 import numpy as np
 import torch.optim as optim
 from models import PreActResNet18, PreActResNet50, Wide_ResNet, VGG
+from models import resnet18, resnet34, resnet50, resnet101
 from vit_pytorch.vit_for_small_dataset import ViT
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
@@ -90,8 +91,12 @@ def get_model(args, device=None):
     elif args.arch == 'swin_b':
         model = timm.create_model('swin_base_patch4_window7_224', pretrained=False)
     elif args.arch.startswith('resnet'):
-        from models import resnet18, resnet34, resnet50, resnet101
-        model = resnet18()
+        if args.arch[6:] == '18':
+            model = resnet18(args.gate)
+        elif args.arch[6:] == '50':
+            model = resnet50(args.gate)
+        elif args.arch[6:] == '101':
+            model = resnet101(args.gate)
     else:
         model = torchvision.models.get_model(args.arch)
 
