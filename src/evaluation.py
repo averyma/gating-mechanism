@@ -28,6 +28,22 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
+def accuracy_gate(gates, pred, target):
+    maxidx = torch.max(gates, dim=1)[1]
+    correct = pred[range(len(maxidx)), :, maxidx].argmax(dim=1) == target
+    acc1 = correct.sum()/target.size(0)*100.
+    acc5 = 1.
+
+    return acc1, acc5
+
+def return_gate_ratio(gates):
+    maxidx = torch.max(gates, dim=1)[1]
+    gate_ratio = torch.zeros(gates.size(1))
+    for i in range(gates.size(1)):
+        gate_ratio[i] += (maxidx.cpu().numpy() == i).sum()
+    gate_ratio.mul_(100/gates.size(0))
+    return gate_ratio
+
 def return_qualified(p_0, p_1, p_adv_0, p_adv_1, target):
     """Computes the accuracy over the k top predictions for the specified values of k"""
     with torch.no_grad():
@@ -171,20 +187,22 @@ def validate_gate(val_loader, model, criterion, args, is_main_task):
                 onehotlabels_new[range(len(target)), target, :] = 1
                 decision_from_gate = (-onehotlabels_new*pred).sum(dim=1).argmin(dim=1)
 
-                loss = criterion(gates, decision_from_gate)
-                for idx in range(logits.shape[2]):
-                    loss += criterion(logits[:, :, idx], target)
-                loss = loss.mean()
-
-
+                logits_reshape = logits.permute(2, 0, 1).reshape(-1, logits.size(1))
+                target_repeat = target.unsqueeze(0).expand(logits.size(2), logits.size(0)).flatten()
+                loss = (criterion(gates, decision_from_gate).mean() +
+                        criterion(logits_reshape, target_repeat).mean())
 
             # measure accuracy and record loss
-            maxidx = torch.max(gates, dim=1)[1]
-            acc1 = (pred[range(len(maxidx)), :, maxidx].argmax(dim=1) == target).sum()/images.size(0)
-            # acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            acc1, acc5 = accuracy_gate(gates, pred, target)
+            gate_ratio = return_gate_ratio(gates)
             losses.update(loss.item(), images.size(0))
             top1.update(acc1, images.size(0))
-            # top5.update(acc5[0], images.size(0))
+            top5.update(acc5, images.size(0))
+            gate1.update(gate_ratio[0], images.size(0))
+            gate2.update(gate_ratio[1], images.size(0))
+            gate3.update(gate_ratio[2], images.size(0))
+            gate4.update(gate_ratio[3], images.size(0))
+            gate5.update(gate_ratio[4], images.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -199,9 +217,14 @@ def validate_gate(val_loader, model, criterion, args, is_main_task):
     losses = AverageMeter('Loss', ':.4e', Summary.NONE)
     top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
     top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
+    gate1 = AverageMeter('G1', ':6.2f', Summary.AVERAGE)
+    gate2 = AverageMeter('G2', ':6.2f', Summary.AVERAGE)
+    gate3 = AverageMeter('G3', ':6.2f', Summary.AVERAGE)
+    gate4 = AverageMeter('G4', ':6.2f', Summary.AVERAGE)
+    gate5 = AverageMeter('G5', ':6.2f', Summary.AVERAGE)
     progress = ProgressMeter(
         len(val_loader) + (args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset))),
-        [batch_time, losses, top1, top5],
+        [batch_time, losses, top1, gate1, gate2, gate3, gate4, gate5],
         prefix='Test: ')
 
     # switch to evaluate mode
@@ -211,6 +234,11 @@ def validate_gate(val_loader, model, criterion, args, is_main_task):
     if args.distributed:
         top1.all_reduce()
         top5.all_reduce()
+        gate1.all_reduce()
+        gate2.all_reduce()
+        gate3.all_reduce()
+        gate4.all_reduce()
+        gate5.all_reduce()
 
     if args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset)):
         aux_val_dataset = Subset(val_loader.dataset,
@@ -223,7 +251,7 @@ def validate_gate(val_loader, model, criterion, args, is_main_task):
     if is_main_task:
         progress.display_summary()
 
-    return top1.avg, top5.avg
+    return top1.avg, top5.avg, (gate1.avg, gate2.avg, gate3.avg, gate4.avg, gate5.avg)
 
 def eval_transfer(val_loader, model_a, model_b, args, is_main_task):
     if args.dataset == 'imagenet':
