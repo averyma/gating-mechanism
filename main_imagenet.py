@@ -294,7 +294,7 @@ def main_worker(gpu, ngpus_per_node, args):
         if args.distributed:
             dist.barrier()
         if args.gate:
-            test_acc1, test_acc5 = validate_gate(test_loader, model, criterion, args, is_main_task)
+            test_acc1, test_acc5, gate_ratio = validate_gate(test_loader, model, criterion, args, is_main_task)
         else:
             test_acc1, test_acc5 = validate(test_loader, model, criterion, args, is_main_task)
         if args.distributed:
@@ -329,6 +329,17 @@ def main_worker(gpu, ngpus_per_node, args):
                     test_acc1=test_acc1,
                     test_acc5=test_acc5,
                     ))
+            if args.gate:
+                for i_gate in range(5):
+                    logger.add_scalar('test/gate{}'.format(i_gate), gate_ratio[i_gate], _epoch)
+                logging.info(
+                    "Epoch: [{}]\t"
+                    "G1: {:.2f}\t"
+                    "G2: {:.2f}\t"
+                    "G3: {:.2f}\t"
+                    "G4: {:.2f}\t"
+                    "G5: {:.2f}\t".format(_epoch, gate_ratio[0], gate_ratio[1],
+                                          gate_ratio[2], gate_ratio[3], gate_ratio[4]))
 
             # checkpointing for preemption
             if _epoch % args.ckpt_freq == 0:
