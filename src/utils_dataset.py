@@ -19,7 +19,7 @@ from torchvision.transforms.functional import InterpolationMode
 # from sklearn.model_selection import train_test_split
 # from torch.utils.data import Subset
 
-data_dir = '/scratch/ssd001/home/ama/workspace/data/'
+data_dir = '/h/ama/workspace/data/'
 
 def load_dataset(dataset, batch_size=128, workers=4, distributed=False, auto_augment=None, ra_magnitude=9, interpolation='bilinear', ra_sampler=False, ra_reps=3, random_erase_prob=0.0, augmix_severity=3):
 
