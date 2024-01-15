@@ -202,7 +202,6 @@ def validate_gate(val_loader, model, criterion, args, is_main_task):
             gate2.update(gate_ratio[1], images.size(0))
             gate3.update(gate_ratio[2], images.size(0))
             gate4.update(gate_ratio[3], images.size(0))
-            gate5.update(gate_ratio[4], images.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -221,10 +220,9 @@ def validate_gate(val_loader, model, criterion, args, is_main_task):
     gate2 = AverageMeter('G2', ':6.2f', Summary.AVERAGE)
     gate3 = AverageMeter('G3', ':6.2f', Summary.AVERAGE)
     gate4 = AverageMeter('G4', ':6.2f', Summary.AVERAGE)
-    gate5 = AverageMeter('G5', ':6.2f', Summary.AVERAGE)
     progress = ProgressMeter(
         len(val_loader) + (args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset))),
-        [batch_time, losses, top1, gate1, gate2, gate3, gate4, gate5],
+        [batch_time, losses, top1, gate1, gate2, gate3, gate4],
         prefix='Test: ')
 
     # switch to evaluate mode
@@ -238,7 +236,6 @@ def validate_gate(val_loader, model, criterion, args, is_main_task):
         gate2.all_reduce()
         gate3.all_reduce()
         gate4.all_reduce()
-        gate5.all_reduce()
 
     if args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset)):
         aux_val_dataset = Subset(val_loader.dataset,
@@ -251,7 +248,7 @@ def validate_gate(val_loader, model, criterion, args, is_main_task):
     if is_main_task:
         progress.display_summary()
 
-    return top1.avg, top5.avg, (gate1.avg, gate2.avg, gate3.avg, gate4.avg, gate5.avg)
+    return top1.avg, top5.avg, (gate1.avg, gate2.avg, gate3.avg, gate4.avg)
 
 def eval_transfer(val_loader, model_a, model_b, args, is_main_task):
     if args.dataset == 'imagenet':
