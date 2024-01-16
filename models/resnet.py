@@ -326,20 +326,17 @@ class ResNet_gate(nn.Module):
         d1 = 64 * block.expansion * 56**2
         d2 = 128 * block.expansion * 28**2
         d3 = 256 * block.expansion * 14**2
-        d4 = 512 * block.expansion * 7**2
-        d5 = 512 * block.expansion
+        d4 = 512 * block.expansion
 
         self.Gate1 = nn.Sequential(nn.Linear(d1, 1), sigmoid, nn.Unflatten(1, (1, 1, 1)))
         self.Gate2 = nn.Sequential(nn.Linear(d2, 1), sigmoid, nn.Unflatten(1, (1, 1, 1)))
         self.Gate3 = nn.Sequential(nn.Linear(d3, 1), sigmoid, nn.Unflatten(1, (1, 1, 1)))
         self.Gate4 = nn.Sequential(nn.Linear(d4, 1), sigmoid, nn.Unflatten(1, (1, 1, 1)))
-        self.Gate5 = nn.Sequential(nn.Linear(d5, 1), sigmoid, nn.Unflatten(1, (1, 1, 1)))
 
         self.fc1 = nn.Linear(d1, num_classes)
         self.fc2 = nn.Linear(d2, num_classes)
         self.fc3 = nn.Linear(d3, num_classes)
         self.fc4 = nn.Linear(d4, num_classes)
-        self.fc5 = nn.Linear(d5, num_classes)
 
     def _make_layer(
         self,
@@ -388,9 +385,8 @@ class ResNet_gate(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
-        bs = x.shape[0]
 
-        gate = torch.ones([bs, 1, 1, 1], device=x.device)
+        gate = torch.ones([x.shape[0], 1, 1, 1], device=x.device)
         x = self.layer1(x * gate)
         x_flatten = torch.flatten(x, 1)
         gate1 = self.Gate1(x_flatten)
@@ -410,22 +406,17 @@ class ResNet_gate(nn.Module):
         logit3 = self.fc3(x_flatten * (1-gate).flatten(1))
 
         x = self.layer4(x * gate)
+
+        x = self.avgpool(x)
         x_flatten = torch.flatten(x, 1)
         gate4 = self.Gate4(x_flatten)
-        gate = gate*(1 - gate4)
-        logit4 = self.fc4(x_flatten * (1-gate).flatten(1))
+        logit4 = self.fc4(x_flatten)
 
-        x = self.avgpool(x * gate)
-        x_flatten = torch.flatten(x, 1)
-        gate5 = self.Gate5(x_flatten)
-        logit5 = self.fc5(x_flatten)
-
-        concatgate = torch.cat([gate1, gate2, gate3, gate4, gate5], dim=1).squeeze()
+        concatgate = torch.cat([gate1, gate2, gate3, gate4], dim=1).squeeze()
         concatlogit = torch.cat([logit1.unsqueeze(2),
                                  logit2.unsqueeze(2),
                                  logit3.unsqueeze(2),
-                                 logit4.unsqueeze(2),
-                                 logit5.unsqueeze(2)], dim=2)
+                                 logit4.unsqueeze(2)], dim=2)
         return concatgate, concatlogit
 
     def forward(self, x: Tensor) -> Tensor:
