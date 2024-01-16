@@ -265,8 +265,13 @@ def main_worker(gpu, ngpus_per_node, args):
                 args.random_erase,
                 args.augmix_severity
                 )
+    if args.dataset == 'imagenet':
+        num_classes = 1000
+    elif args.dataset == 'cifar10':
+        num_classes = 10
+    elif args.dataset == 'cifar100':
+        num_classes = 100
 
-    num_classes = 1000
     mixup_cutmix = get_mixup_cutmix(
             mixup_alpha=args.mixup_alpha,
             cutmix_alpha=args.cutmix_alpha,
@@ -330,16 +335,14 @@ def main_worker(gpu, ngpus_per_node, args):
                     test_acc5=test_acc5,
                     ))
             if args.gate:
-                for i_gate in range(5):
-                    logger.add_scalar('test/gate{}'.format(i_gate), gate_ratio[i_gate], _epoch)
+                for i_gate in range(len(gate_ratio)):
+                    logger.add_scalar('test/gate{}'.format(i_gate+1), gate_ratio[i_gate], _epoch)
                 logging.info(
                     "Epoch: [{}]\t"
                     "G1: {:.2f}\t"
                     "G2: {:.2f}\t"
                     "G3: {:.2f}\t"
-                    "G4: {:.2f}\t"
-                    "G5: {:.2f}\t".format(_epoch, gate_ratio[0], gate_ratio[1],
-                                          gate_ratio[2], gate_ratio[3], gate_ratio[4]))
+                    "G4: {:.2f}\t".format(_epoch, gate_ratio[0], gate_ratio[1], gate_ratio[2], gate_ratio[3]))
 
             # checkpointing for preemption
             if _epoch % args.ckpt_freq == 0:
