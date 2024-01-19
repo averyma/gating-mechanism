@@ -15,7 +15,7 @@ import torch, torchvision
 import torch.nn as nn
 import numpy as np
 import torch.optim as optim
-from models import PreActResNet18, PreActResNet50, Wide_ResNet, VGG
+from models import PreActResNet18, PreActResNet50, PreActResNet101, Wide_ResNet, VGG
 from models import resnet18, resnet34, resnet50, resnet101
 from vit_pytorch.vit_for_small_dataset import ViT
 from torch.utils.data import Dataset, DataLoader
@@ -46,6 +46,8 @@ def get_model(args, device=None):
             model = PreActResNet18(args.gate, num_classes)
         elif args.arch == 'preactresnet50':
             model = PreActResNet50(args.gate, num_classes)
+        elif args.arch == 'preactresnet101':
+            model = PreActResNet101(args.gate, num_classes)
         # elif args.arch == 'wrn28':
             # model = Wide_ResNet(28, 10, 0.3, num_classes)
         # elif args.arch == 'vgg19':
