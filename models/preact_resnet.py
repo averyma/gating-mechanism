@@ -186,8 +186,11 @@ def PreActResNet50(gate, num_classes=10):
     else:
         return PreActResNet_gate(PreActBottleneck, [3,4,6,3], num_classes)
 
-def PreActResNet101():
-    return PreActResNet(PreActBottleneck, [3,4,23,3])
+def PreActResNet101(gate, num_classes=10):
+    if not gate:
+        return PreActResNet(PreActBottleneck, [3,4,23,3], num_classes)
+    else:
+        return PreActResNet_gate(PreActBottleneck, [3,4,23,3], num_classes)
 
 def PreActResNet152():
     return PreActResNet(PreActBottleneck, [3,8,36,3])
