@@ -293,7 +293,7 @@ def main_worker(gpu, ngpus_per_node, args):
         if args.distributed:
             dist.barrier()
         if args.gate:
-            train_acc1, train_acc5, loss = train_gate(train_loader, model, criterion, opt, _epoch, device, args, is_main_task, scaler, mixup_cutmix)
+            train_acc1, train_acc5, loss, loss_from_gate = train_gate(train_loader, model, criterion, opt, _epoch, device, args, is_main_task, scaler, mixup_cutmix)
         else:
             train_acc1, train_acc5, loss = train(train_loader, model, criterion, opt, _epoch, device, args, is_main_task, scaler, mixup_cutmix)
         if args.distributed:
@@ -343,6 +343,12 @@ def main_worker(gpu, ngpus_per_node, args):
                     "G2: {:.2f}\t"
                     "G3: {:.2f}\t"
                     "G4: {:.2f}\t".format(_epoch, gate_ratio[0], gate_ratio[1], gate_ratio[2], gate_ratio[3]))
+
+                logger.add_scalar("train/loss_gate", loss_from_gate[0], _epoch)
+                logger.add_scalar("train/loss_logits1", loss_from_gate[1], _epoch)
+                logger.add_scalar("train/loss_logits2", loss_from_gate[2], _epoch)
+                logger.add_scalar("train/loss_logits3", loss_from_gate[3], _epoch)
+                logger.add_scalar("train/loss_logits4", loss_from_gate[4], _epoch)
 
             # checkpointing for preemption
             if _epoch % args.ckpt_freq == 0:
