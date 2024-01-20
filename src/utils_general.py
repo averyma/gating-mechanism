@@ -129,8 +129,10 @@ def get_optim(parameters, args):
             nesterov=args.nesterov)
     elif args.optim == "adamw":
         opt = optim.AdamW(parameters, lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optim == "adam":
+        opt = optim.Adam(parameters, lr=args.lr)
     else:
-        raise RuntimeError(f"Invalid optimizer {args.opt}. Only SGD, AdamW are supported.")
+        raise RuntimeError(f"Invalid optimizer {args.opt}. Only SGD, Adam, AdamW are supported.")
 
     # check if milestone is an empty array
     if args.lr_scheduler_type == "multistep":
