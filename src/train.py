@@ -192,7 +192,7 @@ def train_gate(train_loader, model, criterion, optimizer, epoch, device, args, i
         if args.debug and i == 2:
             break
 
-    losses_track = [losses_logits1.avg, losses_logits2.avg,
+    losses_track = [losses_gate.avg, losses_logits1.avg, losses_logits2.avg,
                     losses_logits3.avg, losses_logits4.avg]
 
     return top1.avg, top5.avg, losses.avg, losses_track
