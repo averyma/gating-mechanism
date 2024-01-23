@@ -43,11 +43,11 @@ def get_model(args, device=None):
     if args.dataset.startswith('cifar'):
         num_classes = 10 if args.dataset == 'cifar10' else 100
         if args.arch == 'preactresnet18':
-            model = PreActResNet18(args.gate, num_classes)
+            model = PreActResNet18(args.gate, args.shallow, num_classes)
         elif args.arch == 'preactresnet50':
-            model = PreActResNet50(args.gate, num_classes)
+            model = PreActResNet50(args.gate, args.shallow, num_classes)
         elif args.arch == 'preactresnet101':
-            model = PreActResNet101(args.gate, num_classes)
+            model = PreActResNet101(args.gate, args.shallow, num_classes)
         # elif args.arch == 'wrn28':
             # model = Wide_ResNet(28, 10, 0.3, num_classes)
         # elif args.arch == 'vgg19':
